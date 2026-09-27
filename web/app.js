@@ -1,0 +1,380 @@
+(() => {
+  "use strict";
+
+  const STORAGE_KEY = "home-cleaner-appliances-v1";
+  const NOTICE_KEY = "home-cleaner-last-notice";
+
+  const categories = {
+    washingMachine: { label: "Стиральная машина", icon: "🫧", interval: 60 },
+    coffeeMachine: { label: "Кофемашина", icon: "☕️", interval: 30 },
+    dishwasher: { label: "Посудомоечная машина", icon: "🍽️", interval: 60 },
+    kettle: { label: "Чайник", icon: "🫖", interval: 30 },
+    airConditioner: { label: "Кондиционер", icon: "❄️", interval: 180 },
+    vacuum: { label: "Пылесос", icon: "🧹", interval: 60 },
+    refrigerator: { label: "Холодильник", icon: "🧊", interval: 180 },
+    other: { label: "Другое", icon: "🔧", interval: 90 }
+  };
+
+  const elements = {
+    summary: document.querySelector("#summary"),
+    list: document.querySelector("#applianceList"),
+    addButton: document.querySelector("#addButton"),
+    installButton: document.querySelector("#installButton"),
+    notificationButton: document.querySelector("#notificationButton"),
+    dialog: document.querySelector("#applianceDialog"),
+    form: document.querySelector("#applianceForm"),
+    formTitle: document.querySelector("#formTitle"),
+    id: document.querySelector("#applianceId"),
+    name: document.querySelector("#nameInput"),
+    category: document.querySelector("#categoryInput"),
+    lastCleaned: document.querySelector("#lastCleanedInput"),
+    interval: document.querySelector("#intervalInput"),
+    deleteButton: document.querySelector("#deleteButton"),
+    cancelFormButton: document.querySelector("#cancelFormButton"),
+    installDialog: document.querySelector("#installDialog"),
+    closeInstallButton: document.querySelector("#closeInstallButton"),
+    toast: document.querySelector("#toast")
+  };
+
+  let appliances = loadAppliances();
+  let deferredInstallPrompt = null;
+  let toastTimer = null;
+
+  initialize();
+
+  function initialize() {
+    populateCategories();
+    bindEvents();
+    render();
+    registerServiceWorker();
+    checkDueNotifications();
+
+    if (isStandalone()) {
+      elements.installButton.classList.add("hidden");
+    }
+  }
+
+  function bindEvents() {
+    elements.addButton.addEventListener("click", () => openForm());
+    elements.cancelFormButton.addEventListener("click", () => elements.dialog.close());
+    elements.form.addEventListener("submit", saveFromForm);
+    elements.deleteButton.addEventListener("click", deleteFromForm);
+    elements.category.addEventListener("change", applySuggestedInterval);
+    elements.list.addEventListener("click", handleListClick);
+    elements.installButton.addEventListener("click", handleInstall);
+    elements.closeInstallButton.addEventListener("click", () => elements.installDialog.close());
+    elements.notificationButton.addEventListener("click", enableNotifications);
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredInstallPrompt = event;
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredInstallPrompt = null;
+      elements.installButton.classList.add("hidden");
+      showToast("Приложение установлено");
+    });
+  }
+
+  function populateCategories() {
+    elements.category.innerHTML = Object.entries(categories)
+      .map(([value, item]) => `<option value="${value}">${item.icon} ${item.label}</option>`)
+      .join("");
+  }
+
+  function loadAppliances() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function persist() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appliances));
+  }
+
+  function render() {
+    const ordered = [...appliances].sort((a, b) => dueDate(a) - dueDate(b));
+    renderSummary(ordered);
+
+    if (ordered.length === 0) {
+      elements.list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">✨</div>
+          <h2>Добавьте первую технику</h2>
+          <p>Укажите дату и периодичность — приложение рассчитает следующую чистку.</p>
+        </div>`;
+      return;
+    }
+
+    elements.list.innerHTML = ordered.map(renderCard).join("");
+  }
+
+  function renderSummary(ordered) {
+    const overdue = ordered.filter((item) => daysUntilDue(item) < 0).length;
+    const dueSoon = ordered.filter((item) => {
+      const days = daysUntilDue(item);
+      return days >= 0 && days <= 7;
+    }).length;
+
+    let value = "Всё под контролем";
+    let note = ordered.length === 0 ? "Добавьте технику, чтобы начать" : "Ближайших чисток пока нет";
+
+    if (overdue > 0) {
+      value = "Пора заняться чисткой";
+      note = `Просрочено устройств: ${overdue}`;
+    } else if (dueSoon > 0) {
+      value = "Скоро понадобится забота";
+      note = `В ближайшие 7 дней: ${dueSoon}`;
+    }
+
+    elements.summary.innerHTML = `
+      <p class="summary-label">Состояние дома</p>
+      <p class="summary-value">${value}</p>
+      <p class="summary-note">${note}</p>`;
+  }
+
+  function renderCard(appliance) {
+    const category = categories[appliance.category] || categories.other;
+    const status = statusFor(appliance);
+    const cleanCount = Array.isArray(appliance.records) ? appliance.records.length : 0;
+
+    return `
+      <article class="appliance-card">
+        <div class="card-main">
+          <div class="category-icon" aria-hidden="true">${category.icon}</div>
+          <div class="card-copy">
+            <p class="card-title">${escapeHtml(appliance.name)}</p>
+            <p class="card-date">Следующая: ${formatDate(dueDate(appliance))}</p>
+          </div>
+          <span class="status ${status.kind}">${status.label}</span>
+        </div>
+        <div class="card-actions">
+          <button class="card-action" type="button" data-action="clean" data-id="${appliance.id}">✓ Очищено</button>
+          <button class="card-action secondary" type="button" data-action="edit" data-id="${appliance.id}">
+            ${cleanCount ? `История: ${cleanCount}` : "Изменить"}
+          </button>
+        </div>
+      </article>`;
+  }
+
+  function openForm(appliance = null) {
+    const today = toDateInput(new Date());
+    elements.form.reset();
+    elements.id.value = appliance?.id || "";
+    elements.name.value = appliance?.name || "";
+    elements.category.value = appliance?.category || "washingMachine";
+    elements.lastCleaned.value = appliance?.lastCleaned || today;
+    elements.lastCleaned.max = today;
+    elements.interval.value = appliance?.interval || categories.washingMachine.interval;
+    elements.formTitle.textContent = appliance ? "Техника" : "Новая техника";
+    elements.deleteButton.classList.toggle("hidden", !appliance);
+    elements.dialog.showModal();
+    window.setTimeout(() => elements.name.focus(), 100);
+  }
+
+  function saveFromForm(event) {
+    event.preventDefault();
+
+    const id = elements.id.value;
+    const existing = appliances.find((item) => item.id === id);
+    const item = {
+      id: id || createId(),
+      name: elements.name.value.trim(),
+      category: elements.category.value,
+      lastCleaned: elements.lastCleaned.value,
+      interval: clamp(Number(elements.interval.value), 1, 730),
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      records: existing?.records || []
+    };
+
+    if (!item.name) return;
+
+    appliances = existing
+      ? appliances.map((current) => current.id === id ? item : current)
+      : [...appliances, item];
+
+    persist();
+    render();
+    elements.dialog.close();
+    showToast(existing ? "Изменения сохранены" : "Техника добавлена");
+  }
+
+  function deleteFromForm() {
+    const id = elements.id.value;
+    const appliance = appliances.find((item) => item.id === id);
+    if (!appliance || !window.confirm(`Удалить «${appliance.name}» вместе с историей?`)) return;
+
+    appliances = appliances.filter((item) => item.id !== id);
+    persist();
+    render();
+    elements.dialog.close();
+    showToast("Техника удалена");
+  }
+
+  function handleListClick(event) {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+
+    const appliance = appliances.find((item) => item.id === button.dataset.id);
+    if (!appliance) return;
+
+    if (button.dataset.action === "edit") {
+      openForm(appliance);
+      return;
+    }
+
+    if (button.dataset.action === "clean") {
+      const now = new Date();
+      appliance.lastCleaned = toDateInput(now);
+      appliance.records = [now.toISOString(), ...(appliance.records || [])].slice(0, 100);
+      persist();
+      render();
+      showToast(`«${appliance.name}» отмечена как очищенная`);
+    }
+  }
+
+  function applySuggestedInterval() {
+    elements.interval.value = categories[elements.category.value]?.interval || 90;
+  }
+
+  function dueDate(appliance) {
+    const date = parseLocalDate(appliance.lastCleaned);
+    date.setDate(date.getDate() + Number(appliance.interval || 1));
+    return date;
+  }
+
+  function daysUntilDue(appliance) {
+    const today = startOfDay(new Date());
+    const due = startOfDay(dueDate(appliance));
+    return Math.round((due - today) / 86400000);
+  }
+
+  function statusFor(appliance) {
+    const days = daysUntilDue(appliance);
+    if (days < 0) return { kind: "overdue", label: `Просрочено ${Math.abs(days)} дн.` };
+    if (days === 0) return { kind: "soon", label: "Сегодня" };
+    if (days <= 7) return { kind: "soon", label: `Через ${days} дн.` };
+    return { kind: "planned", label: `Через ${days} дн.` };
+  }
+
+  async function enableNotifications() {
+    if (!("Notification" in window)) {
+      showToast("Этот браузер не поддерживает уведомления");
+      return;
+    }
+
+    if (!isStandalone() && isIOS()) {
+      elements.installDialog.showModal();
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      showToast("Напоминания включены");
+      await checkDueNotifications(true);
+    } else {
+      showToast("Уведомления не разрешены");
+    }
+  }
+
+  async function checkDueNotifications(force = false) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    const today = toDateInput(new Date());
+    if (!force && localStorage.getItem(NOTICE_KEY) === today) return;
+
+    const dueItems = appliances.filter((item) => daysUntilDue(item) <= 0);
+    if (dueItems.length === 0) return;
+
+    const registration = await navigator.serviceWorker?.ready;
+    if (!registration) return;
+
+    await registration.showNotification("Пора почистить технику", {
+      body: dueItems.length === 1
+        ? `${dueItems[0].name} ждёт плановой очистки.`
+        : `Устройств к очистке: ${dueItems.length}.`,
+      icon: "./icon-192.png",
+      badge: "./icon-192.png",
+      tag: `cleaning-${today}`,
+      data: { url: "./" }
+    });
+    localStorage.setItem(NOTICE_KEY, today);
+  }
+
+  async function handleInstall() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      return;
+    }
+
+    elements.installDialog.showModal();
+  }
+
+  async function registerServiceWorker() {
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      await navigator.serviceWorker.register("./sw.js");
+    } catch (error) {
+      console.warn("Service worker registration failed", error);
+    }
+  }
+
+  function isStandalone() {
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+
+  function isIOS() {
+    return /iphone|ipad|ipod/i.test(navigator.userAgent);
+  }
+
+  function createId() {
+    return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function parseLocalDate(value) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  function toDateInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatDate(date) {
+    return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function escapeHtml(value) {
+    return value.replace(/[&<>'"]/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      "\"": "&quot;"
+    })[character]);
+  }
+
+  function showToast(message) {
+    window.clearTimeout(toastTimer);
+    elements.toast.textContent = message;
+    elements.toast.classList.add("visible");
+    toastTimer = window.setTimeout(() => elements.toast.classList.remove("visible"), 2600);
+  }
+})();

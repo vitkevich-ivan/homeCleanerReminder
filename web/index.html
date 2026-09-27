@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f4f7fb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Дом в порядке">
+    <meta name="description" content="Напоминания о чистке домашней техники">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
+    <link rel="stylesheet" href="./styles.css">
+    <title>Дом в порядке</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">МОЯ ТЕХНИКА</p>
+          <h1>Дом в порядке</h1>
+        </div>
+        <button class="icon-button" id="installButton" type="button" aria-label="Установить приложение" title="Установить приложение">
+          <span aria-hidden="true">↓</span>
+        </button>
+      </header>
+
+      <main>
+        <section class="summary" id="summary" aria-live="polite"></section>
+
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">РАСПИСАНИЕ</p>
+            <h2>Ближайшие чистки</h2>
+          </div>
+          <button class="text-button" id="notificationButton" type="button">Напоминания</button>
+        </div>
+
+        <section class="appliance-list" id="applianceList" aria-live="polite"></section>
+      </main>
+
+      <button class="floating-button" id="addButton" type="button">
+        <span aria-hidden="true">＋</span>
+        Добавить технику
+      </button>
+    </div>
+
+    <dialog class="sheet" id="applianceDialog">
+      <form id="applianceForm" method="dialog">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-header">
+          <button class="text-button" id="cancelFormButton" type="button">Отмена</button>
+          <h2 id="formTitle">Новая техника</h2>
+          <button class="text-button strong" type="submit">Готово</button>
+        </div>
+
+        <input id="applianceId" type="hidden">
+
+        <label class="field">
+          <span>Название</span>
+          <input id="nameInput" type="text" maxlength="50" placeholder="Например, кофемашина" required autocomplete="off">
+        </label>
+
+        <label class="field">
+          <span>Тип техники</span>
+          <select id="categoryInput"></select>
+        </label>
+
+        <label class="field">
+          <span>Последняя чистка</span>
+          <input id="lastCleanedInput" type="date" required>
+        </label>
+
+        <label class="field">
+          <span>Повторять каждые</span>
+          <span class="input-with-suffix">
+            <input id="intervalInput" type="number" min="1" max="730" inputmode="numeric" required>
+            <span>дней</span>
+          </span>
+        </label>
+
+        <button class="danger-button hidden" id="deleteButton" type="button">Удалить технику</button>
+      </form>
+    </dialog>
+
+    <dialog class="sheet compact-sheet" id="installDialog">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="install-content">
+        <div class="install-icon">🏠</div>
+        <h2>Установить на iPhone</h2>
+        <ol>
+          <li>Откройте эту страницу в Safari.</li>
+          <li>Нажмите кнопку «Поделиться» <span aria-hidden="true">□↑</span>.</li>
+          <li>Выберите «На экран Домой» и нажмите «Добавить».</li>
+        </ol>
+        <button class="primary-button" id="closeInstallButton" type="button">Понятно</button>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
