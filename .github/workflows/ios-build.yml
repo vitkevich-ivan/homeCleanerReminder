@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build for iOS Simulator
+    name: Build installable IPA
     runs-on: macos-15
     timeout-minutes: 20
 
@@ -30,23 +30,27 @@ jobs:
             -project HomeCleaner.xcodeproj \
             -scheme HomeCleaner \
             -configuration Release \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build/DerivedData \
             CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             | tee build.log
 
-      - name: Package application
+      - name: Package unsigned IPA
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            build/DerivedData/Build/Products/Release-iphonesimulator/HomeCleaner.app \
-            HomeCleaner-Simulator.zip
+          mkdir -p Payload
+          ditto \
+            build/DerivedData/Build/Products/Release-iphoneos/HomeCleaner.app \
+            Payload/HomeCleaner.app
+          ditto -c -k --sequesterRsrc --keepParent Payload HomeCleaner.ipa
+          test -s HomeCleaner.ipa
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: HomeCleaner-iOS-Simulator
-          path: HomeCleaner-Simulator.zip
+          name: HomeCleaner-iOS17
+          path: HomeCleaner.ipa
           if-no-files-found: error
           retention-days: 14
 

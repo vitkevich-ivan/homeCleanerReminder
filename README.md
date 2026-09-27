@@ -28,6 +28,6 @@
 
 ## Автоматическая сборка
 
-GitHub Actions запускает сборку после каждого push или pull request в `main`. Готовый архив `HomeCleaner-Simulator.zip` можно скачать на странице завершённого workflow в разделе **Artifacts**.
+GitHub Actions запускает сборку после каждого push или pull request в `main`. Артефакт `HomeCleaner-iOS17` можно скачать на странице завершённого workflow в разделе **Artifacts**. В скачанном архиве находится файл `HomeCleaner.ipa`.
 
-Артефакт предназначен для iOS Simulator. Для установки приложения на физический iPhone потребуется настроить Apple Developer Team, сертификат и provisioning profile в GitHub Secrets.
+Собранный IPA не подписан. Для установки на физический iPhone его нужно подписать своим Apple ID, например через Sideloadly. При использовании бесплатного Apple ID подпись обычно требуется обновлять каждые 7 дней.
