@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: supabase-functions
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
