@@ -4,6 +4,7 @@
   const SUPABASE_URL = "https://vptyxdhkqklgjaowbrcj.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rHDFNariizbk0p1qYfygIQ_1hbLMoof";
   const VAPID_PUBLIC_KEY = "BL-1ATl6rBVG5E4rfcn2flQw4t8ZaZrAXkhLLr8MVk9RtzOdU54VrbLCEdxABz7BZJ6KzordTfBLCXQxLfFLEp0";
+  const APP_URL = "https://vitkevich-ivan.github.io/homeCleanerReminder/";
 
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
@@ -100,10 +101,9 @@
     if (!currentUser) throw new Error("Облачная сессия ещё не готова");
     if (!currentUser.is_anonymous) throw new Error("Email уже подключён к аккаунту");
 
-    const redirectTo = `${window.location.origin}${window.location.pathname}`;
     const { data, error } = await client.auth.updateUser(
       { email, password },
-      { emailRedirectTo: redirectTo }
+      { emailRedirectTo: APP_URL }
     );
     if (error) throw error;
 
@@ -123,6 +123,15 @@
     currentUser = data.user;
     emitAuthState();
     return { changedUser: Boolean(previousUserId && previousUserId !== currentUser.id) };
+  }
+
+  async function resendEmailConfirmation(email) {
+    const { error } = await client.auth.resend({
+      type: "email_change",
+      email,
+      options: { emailRedirectTo: APP_URL }
+    });
+    if (error) throw error;
   }
 
   function mergeAppliances(localItems, remoteRows) {
@@ -220,6 +229,7 @@
     savePushSubscription,
     registerWithEmail,
     signInWithEmail,
+    resendEmailConfirmation,
     reportError,
     vapidPublicKey: VAPID_PUBLIC_KEY,
     get client() { return client; },

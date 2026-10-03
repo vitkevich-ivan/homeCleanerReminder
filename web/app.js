@@ -45,6 +45,7 @@
     registerEmailButton: document.querySelector("#registerEmailButton"),
     signInEmailButton: document.querySelector("#signInEmailButton"),
     accountEmailStatus: document.querySelector("#accountEmailStatus"),
+    resendEmailButton: document.querySelector("#resendEmailButton"),
     closeAccountButton: document.querySelector("#closeAccountButton"),
     toast: document.querySelector("#toast")
   };
@@ -64,6 +65,7 @@
     registerServiceWorker();
     checkDueNotifications();
     initializeCloudSync();
+    handleAuthRedirectError();
 
     if (isStandalone()) {
       elements.installButton.classList.add("hidden");
@@ -84,6 +86,7 @@
     elements.closeAccountButton.addEventListener("click", () => elements.accountDialog.close());
     elements.accountForm.addEventListener("submit", registerEmailAccount);
     elements.signInEmailButton.addEventListener("click", signInEmailAccount);
+    elements.resendEmailButton.addEventListener("click", resendEmailConfirmation);
 
     window.addEventListener("homecleaner:cloudstatus", (event) => {
       const { state, label, detail } = event.detail;
@@ -155,6 +158,7 @@
     const connected = !account.isAnonymous && account.emailConfirmed && Boolean(account.email);
     elements.emailAuthFields.classList.toggle("hidden", connected);
     elements.accountEmailStatus.classList.toggle("hidden", !connected && !awaitingConfirmation);
+    elements.resendEmailButton.classList.toggle("hidden", !awaitingConfirmation);
 
     if (connected) {
       elements.accountTitle.textContent = "Email подключён";
@@ -220,6 +224,39 @@
     }
   }
 
+  async function resendEmailConfirmation() {
+    const email = elements.accountEmailInput.value.trim().toLowerCase()
+      || window.HomeCleanerCloud.account.pendingEmail
+      || window.HomeCleanerCloud.account.email;
+    if (!email) return;
+
+    setAccountBusy(true, "Отправка…");
+    elements.resendEmailButton.disabled = true;
+    try {
+      await window.HomeCleanerCloud.resendEmailConfirmation(email);
+      showToast("Новое письмо отправлено");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      elements.resendEmailButton.disabled = false;
+      setAccountBusy(false);
+    }
+  }
+
+  function handleAuthRedirectError() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const errorCode = params.get("error_code");
+    if (!errorCode) return;
+
+    window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+    window.setTimeout(() => {
+      openAccountDialog();
+      showToast(errorCode === "otp_expired"
+        ? "Ссылка устарела — запросите новое письмо"
+        : "Не удалось подтвердить email");
+    }, 300);
+  }
+
   function accountCredentials() {
     const email = elements.accountEmailInput.value.trim().toLowerCase();
     const password = elements.accountPasswordInput.value;
@@ -232,6 +269,7 @@
     elements.signInEmailButton.disabled = busy;
     elements.accountEmailInput.disabled = busy;
     elements.accountPasswordInput.disabled = busy;
+    elements.resendEmailButton.disabled = busy;
     elements.registerEmailButton.textContent = busy ? label : "Создать аккаунт";
   }
 
