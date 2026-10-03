@@ -686,6 +686,79 @@ h2 {
   font-size: 14px;
 }
 
+.settings-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-solid);
+}
+
+.settings-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 64px;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+}
+
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-row-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  font-size: 19px;
+}
+
+.settings-row-copy {
+  min-width: 0;
+}
+
+.settings-row-copy strong,
+.settings-row-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row-copy strong {
+  font-size: 14px;
+}
+
+.settings-row-copy small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-chevron {
+  color: var(--muted);
+  font-size: 23px;
+}
+
+.settings-version {
+  margin-top: 16px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+}
+
 .notification-time-field {
   margin-top: 18px;
   text-align: left;

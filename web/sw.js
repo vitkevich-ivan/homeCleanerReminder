@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-cleaner-v13";
+const CACHE_NAME = "home-cleaner-v14";
 const APP_SHELL = [
   "./",
   "./index.html",

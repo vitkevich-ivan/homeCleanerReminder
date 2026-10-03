@@ -27,8 +27,8 @@
             <span class="sync-dot" aria-hidden="true"></span>
             <span id="syncStatusLabel">На устройстве</span>
           </button>
-          <button class="icon-button" id="installButton" type="button" aria-label="Установить приложение" title="Установить приложение">
-            <span aria-hidden="true">↓</span>
+          <button class="icon-button" id="settingsButton" type="button" aria-label="Открыть настройки" title="Настройки">
+            <span aria-hidden="true">⚙︎</span>
           </button>
         </div>
       </header>
@@ -107,6 +107,64 @@
         <button class="primary-button" type="submit">Добавить</button>
       </form>
       <div class="history-list" id="historyList"></div>
+    </dialog>
+
+    <dialog class="sheet compact-sheet" id="settingsDialog">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <button class="text-button" id="closeSettingsButton" type="button">Закрыть</button>
+        <h2>Настройки</h2>
+        <span class="sheet-header-spacer" aria-hidden="true"></span>
+      </div>
+
+      <div class="settings-list">
+        <button class="settings-row" id="settingsAccountButton" type="button">
+          <span class="settings-row-icon" aria-hidden="true">👤</span>
+          <span class="settings-row-copy">
+            <strong>Аккаунт</strong>
+            <small id="settingsAccountStatus">Гостевой профиль</small>
+          </span>
+          <span class="settings-chevron" aria-hidden="true">›</span>
+        </button>
+
+        <button class="settings-row" id="settingsNotificationButton" type="button">
+          <span class="settings-row-icon" aria-hidden="true">🔔</span>
+          <span class="settings-row-copy">
+            <strong>Уведомления</strong>
+            <small id="settingsNotificationStatus">Не настроены</small>
+          </span>
+          <span class="settings-chevron" aria-hidden="true">›</span>
+        </button>
+
+        <button class="settings-row" id="settingsSyncButton" type="button">
+          <span class="settings-row-icon" aria-hidden="true">☁️</span>
+          <span class="settings-row-copy">
+            <strong>Синхронизация</strong>
+            <small id="settingsSyncStatus">На устройстве</small>
+          </span>
+          <span class="settings-chevron" aria-hidden="true">↻</span>
+        </button>
+
+        <button class="settings-row" id="installButton" type="button">
+          <span class="settings-row-icon" aria-hidden="true">📲</span>
+          <span class="settings-row-copy">
+            <strong>Установить приложение</strong>
+            <small>Добавить на экран «Домой»</small>
+          </span>
+          <span class="settings-chevron" aria-hidden="true">›</span>
+        </button>
+
+        <a class="settings-row" href="./privacy.html" target="_blank" rel="noopener">
+          <span class="settings-row-icon" aria-hidden="true">🔒</span>
+          <span class="settings-row-copy">
+            <strong>Конфиденциальность</strong>
+            <small>Какие данные хранит приложение</small>
+          </span>
+          <span class="settings-chevron" aria-hidden="true">›</span>
+        </a>
+      </div>
+
+      <p class="settings-version">Дом в порядке · версия <span id="settingsVersion">1.2.0</span></p>
     </dialog>
 
     <dialog class="sheet compact-sheet" id="notificationDialog">

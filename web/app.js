@@ -8,6 +8,7 @@
   const NOTIFICATION_HOUR_KEY = "home-cleaner-notification-hour-v1";
   const NOTIFICATION_LEAD_KEY = "home-cleaner-notification-lead-v1";
   const NOTICE_KEY = "home-cleaner-last-notice";
+  const APP_VERSION = "1.2.0";
 
   const categories = {
     washingMachine: { label: "Стиральная машина", icon: "🫧", interval: 60 },
@@ -25,6 +26,16 @@
     list: document.querySelector("#applianceList"),
     addButton: document.querySelector("#addButton"),
     installButton: document.querySelector("#installButton"),
+    settingsButton: document.querySelector("#settingsButton"),
+    settingsDialog: document.querySelector("#settingsDialog"),
+    closeSettingsButton: document.querySelector("#closeSettingsButton"),
+    settingsAccountButton: document.querySelector("#settingsAccountButton"),
+    settingsAccountStatus: document.querySelector("#settingsAccountStatus"),
+    settingsNotificationButton: document.querySelector("#settingsNotificationButton"),
+    settingsNotificationStatus: document.querySelector("#settingsNotificationStatus"),
+    settingsSyncButton: document.querySelector("#settingsSyncButton"),
+    settingsSyncStatus: document.querySelector("#settingsSyncStatus"),
+    settingsVersion: document.querySelector("#settingsVersion"),
     syncStatus: document.querySelector("#syncStatus"),
     syncStatusLabel: document.querySelector("#syncStatusLabel"),
     notificationButton: document.querySelector("#notificationButton"),
@@ -114,13 +125,18 @@
     elements.historyList.addEventListener("click", deleteHistoryDate);
     elements.closeHistoryButton.addEventListener("click", () => elements.historyDialog.close());
     elements.installButton.addEventListener("click", handleInstall);
+    elements.settingsButton.addEventListener("click", openSettings);
+    elements.closeSettingsButton.addEventListener("click", () => elements.settingsDialog.close());
+    elements.settingsAccountButton.addEventListener("click", openAccountDialog);
+    elements.settingsNotificationButton.addEventListener("click", openNotificationSettings);
+    elements.settingsSyncButton.addEventListener("click", syncNow);
     elements.closeInstallButton.addEventListener("click", () => elements.installDialog.close());
     elements.notificationButton.addEventListener("click", openNotificationSettings);
     elements.enableNotificationButton.addEventListener("click", enableNotifications);
     elements.testNotificationButton.addEventListener("click", testNotification);
     elements.disableNotificationButton.addEventListener("click", disableNotifications);
     elements.closeNotificationButton.addEventListener("click", () => elements.notificationDialog.close());
-    elements.syncStatus.addEventListener("click", openAccountDialog);
+    elements.syncStatus.addEventListener("click", openSettings);
     elements.closeAccountButton.addEventListener("click", () => elements.accountDialog.close());
     elements.accountForm.addEventListener("submit", registerEmailAccount);
     elements.signInEmailButton.addEventListener("click", signInEmailAccount);
@@ -139,6 +155,7 @@
       elements.syncStatusLabel.textContent = label;
       elements.syncStatus.dataset.detail = detail || label;
       elements.syncStatus.title = detail || label;
+      elements.settingsSyncStatus.textContent = detail || label;
     });
 
     window.addEventListener("homecleaner:authstate", (event) => {
@@ -210,6 +227,7 @@
   }
 
   function openAccountDialog() {
+    closeDialog(elements.settingsDialog);
     if (window.HomeCleanerCloud?.account) {
       renderAccountState(window.HomeCleanerCloud.account);
     }
@@ -221,6 +239,11 @@
     const awaitingConfirmation = Boolean(pendingEmail);
     const connected = !account.isAnonymous && account.emailConfirmed && Boolean(account.email);
     const showAuthFields = account.isAnonymous || !account.emailConfirmed;
+    elements.settingsAccountStatus.textContent = awaitingConfirmation
+      ? `Ожидает подтверждения: ${pendingEmail}`
+      : connected
+        ? account.email
+        : "Гостевой профиль";
     elements.emailAuthFields.classList.toggle("hidden", !showAuthFields);
     elements.accountManagement.classList.toggle("hidden", !connected);
     elements.accountEmailStatus.classList.toggle("hidden", !connected && !awaitingConfirmation);
@@ -394,13 +417,35 @@
   }
 
   async function syncNow() {
+    elements.settingsSyncButton.disabled = true;
     setAccountBusy(true, "Синхронизация…");
     try {
       await initializeCloudSync();
       showToast("Синхронизация завершена");
     } finally {
       setAccountBusy(false);
+      elements.settingsSyncButton.disabled = false;
     }
+  }
+
+  function openSettings() {
+    elements.settingsVersion.textContent = APP_VERSION;
+    if (window.HomeCleanerCloud?.account) renderAccountState(window.HomeCleanerCloud.account);
+    const detail = elements.syncStatus.dataset.detail || elements.syncStatusLabel.textContent;
+    elements.settingsSyncStatus.textContent = detail;
+    const hour = Number(localStorage.getItem(NOTIFICATION_HOUR_KEY) || 10);
+    const leadDays = Number(localStorage.getItem(NOTIFICATION_LEAD_KEY) || 0);
+    elements.notificationTimeInput.value = `${String(hour).padStart(2, "0")}:00`;
+    elements.notificationLeadInput.value = String(leadDays);
+    elements.installButton.classList.toggle("hidden", isStandalone());
+    elements.settingsDialog.showModal();
+    renderNotificationSettings().catch(() => {
+      elements.settingsNotificationStatus.textContent = "Не удалось проверить";
+    });
+  }
+
+  function closeDialog(dialog) {
+    if (dialog.open) dialog.close();
   }
 
   function handleAuthRedirectError() {
@@ -786,6 +831,7 @@
   }
 
   async function openNotificationSettings() {
+    closeDialog(elements.settingsDialog);
     const hour = Number(localStorage.getItem(NOTIFICATION_HOUR_KEY) || 10);
     const leadDays = Number(localStorage.getItem(NOTIFICATION_LEAD_KEY) || 0);
     elements.notificationTimeInput.value = `${String(hour).padStart(2, "0")}:00`;
@@ -805,6 +851,11 @@
         : supported
           ? "Фоновые напоминания ещё не включены"
           : "Этот браузер не поддерживает уведомления";
+    elements.settingsNotificationStatus.textContent = enabled
+      ? `Включены · ${elements.notificationTimeInput.value}`
+      : supported && Notification.permission === "denied"
+        ? "Запрещены в системе"
+        : "Не настроены";
     elements.enableNotificationButton.textContent = enabled ? "Сохранить время" : "Включить напоминания";
     elements.disableNotificationButton.classList.toggle("hidden", !enabled);
   }
@@ -901,6 +952,7 @@
   }
 
   async function handleInstall() {
+    closeDialog(elements.settingsDialog);
     if (deferredInstallPrompt) {
       deferredInstallPrompt.prompt();
       await deferredInstallPrompt.userChoice;
