@@ -2,7 +2,7 @@ name: Send Due Reminders
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - ".github/workflows/send-reminders.yml"
   schedule:

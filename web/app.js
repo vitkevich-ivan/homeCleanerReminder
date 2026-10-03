@@ -1,7 +1,12 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "home-cleaner-appliances-v1";
+  const LEGACY_STORAGE_KEY = "home-cleaner-appliances-v1";
+  const STORAGE_PREFIX = "home-cleaner-appliances-v2:";
+  const ACTIVE_USER_KEY = "home-cleaner-active-user-v1";
+  const DELETION_QUEUE_KEY = "home-cleaner-deletions-v1";
+  const NOTIFICATION_HOUR_KEY = "home-cleaner-notification-hour-v1";
+  const NOTIFICATION_LEAD_KEY = "home-cleaner-notification-lead-v1";
   const NOTICE_KEY = "home-cleaner-last-notice";
 
   const categories = {
@@ -23,6 +28,14 @@
     syncStatus: document.querySelector("#syncStatus"),
     syncStatusLabel: document.querySelector("#syncStatusLabel"),
     notificationButton: document.querySelector("#notificationButton"),
+    notificationDialog: document.querySelector("#notificationDialog"),
+    notificationStatus: document.querySelector("#notificationStatus"),
+    notificationTimeInput: document.querySelector("#notificationTimeInput"),
+    notificationLeadInput: document.querySelector("#notificationLeadInput"),
+    enableNotificationButton: document.querySelector("#enableNotificationButton"),
+    testNotificationButton: document.querySelector("#testNotificationButton"),
+    disableNotificationButton: document.querySelector("#disableNotificationButton"),
+    closeNotificationButton: document.querySelector("#closeNotificationButton"),
     dialog: document.querySelector("#applianceDialog"),
     form: document.querySelector("#applianceForm"),
     formTitle: document.querySelector("#formTitle"),
@@ -33,6 +46,12 @@
     interval: document.querySelector("#intervalInput"),
     deleteButton: document.querySelector("#deleteButton"),
     cancelFormButton: document.querySelector("#cancelFormButton"),
+    historyDialog: document.querySelector("#historyDialog"),
+    historyForm: document.querySelector("#historyForm"),
+    historyTitle: document.querySelector("#historyTitle"),
+    historyDateInput: document.querySelector("#historyDateInput"),
+    historyList: document.querySelector("#historyList"),
+    closeHistoryButton: document.querySelector("#closeHistoryButton"),
     installDialog: document.querySelector("#installDialog"),
     closeInstallButton: document.querySelector("#closeInstallButton"),
     accountDialog: document.querySelector("#accountDialog"),
@@ -44,9 +63,20 @@
     accountPasswordInput: document.querySelector("#accountPasswordInput"),
     registerEmailButton: document.querySelector("#registerEmailButton"),
     signInEmailButton: document.querySelector("#signInEmailButton"),
+    resetPasswordButton: document.querySelector("#resetPasswordButton"),
     accountEmailStatus: document.querySelector("#accountEmailStatus"),
     resendEmailButton: document.querySelector("#resendEmailButton"),
+    accountManagement: document.querySelector("#accountManagement"),
+    newEmailInput: document.querySelector("#newEmailInput"),
+    newPasswordInput: document.querySelector("#newPasswordInput"),
+    changeEmailButton: document.querySelector("#changeEmailButton"),
+    changePasswordButton: document.querySelector("#changePasswordButton"),
+    syncNowButton: document.querySelector("#syncNowButton"),
+    signOutButton: document.querySelector("#signOutButton"),
+    deleteAccountButton: document.querySelector("#deleteAccountButton"),
     closeAccountButton: document.querySelector("#closeAccountButton"),
+    updateBanner: document.querySelector("#updateBanner"),
+    reloadAppButton: document.querySelector("#reloadAppButton"),
     toast: document.querySelector("#toast")
   };
 
@@ -55,6 +85,7 @@
   let toastTimer = null;
   let cloudSyncTimer = null;
   let cloudReady = false;
+  let historyApplianceId = null;
 
   initialize();
 
@@ -79,14 +110,28 @@
     elements.deleteButton.addEventListener("click", deleteFromForm);
     elements.category.addEventListener("change", applySuggestedInterval);
     elements.list.addEventListener("click", handleListClick);
+    elements.historyForm.addEventListener("submit", addHistoryDate);
+    elements.historyList.addEventListener("click", deleteHistoryDate);
+    elements.closeHistoryButton.addEventListener("click", () => elements.historyDialog.close());
     elements.installButton.addEventListener("click", handleInstall);
     elements.closeInstallButton.addEventListener("click", () => elements.installDialog.close());
-    elements.notificationButton.addEventListener("click", enableNotifications);
+    elements.notificationButton.addEventListener("click", openNotificationSettings);
+    elements.enableNotificationButton.addEventListener("click", enableNotifications);
+    elements.testNotificationButton.addEventListener("click", testNotification);
+    elements.disableNotificationButton.addEventListener("click", disableNotifications);
+    elements.closeNotificationButton.addEventListener("click", () => elements.notificationDialog.close());
     elements.syncStatus.addEventListener("click", openAccountDialog);
     elements.closeAccountButton.addEventListener("click", () => elements.accountDialog.close());
     elements.accountForm.addEventListener("submit", registerEmailAccount);
     elements.signInEmailButton.addEventListener("click", signInEmailAccount);
+    elements.resetPasswordButton.addEventListener("click", sendPasswordReset);
     elements.resendEmailButton.addEventListener("click", resendEmailConfirmation);
+    elements.changeEmailButton.addEventListener("click", changeAccountEmail);
+    elements.changePasswordButton.addEventListener("click", changeAccountPassword);
+    elements.syncNowButton.addEventListener("click", syncNow);
+    elements.signOutButton.addEventListener("click", signOutAccount);
+    elements.deleteAccountButton.addEventListener("click", deleteAccount);
+    elements.reloadAppButton.addEventListener("click", () => window.location.reload());
 
     window.addEventListener("homecleaner:cloudstatus", (event) => {
       const { state, label, detail } = event.detail;
@@ -98,6 +143,19 @@
 
     window.addEventListener("homecleaner:authstate", (event) => {
       renderAccountState(event.detail);
+    });
+
+    window.addEventListener("homecleaner:passwordrecovery", () => {
+      window.setTimeout(() => {
+        renderAccountState(window.HomeCleanerCloud.account);
+        elements.accountDialog.showModal();
+        elements.newPasswordInput.focus();
+        showToast("Введите новый пароль");
+      }, 250);
+    });
+
+    window.addEventListener("homecleaner:deletionssynced", (event) => {
+      clearDeletionQueue(event.detail.userId);
     });
 
     window.addEventListener("beforeinstallprompt", (event) => {
@@ -120,15 +178,19 @@
 
   function loadAppliances() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      return Array.isArray(parsed) ? parsed : [];
+      const activeUserId = localStorage.getItem(ACTIVE_USER_KEY);
+      const scoped = activeUserId ? localStorage.getItem(`${STORAGE_PREFIX}${activeUserId}`) : null;
+      const parsed = JSON.parse(scoped || localStorage.getItem(LEGACY_STORAGE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed.map(normalizeApplianceHistory) : [];
     } catch {
       return [];
     }
   }
 
   function persist(sync = true) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appliances));
+    const userId = window.HomeCleanerCloud?.user?.id || localStorage.getItem(ACTIVE_USER_KEY);
+    const key = userId ? `${STORAGE_PREFIX}${userId}` : LEGACY_STORAGE_KEY;
+    localStorage.setItem(key, JSON.stringify(appliances));
     if (sync) scheduleCloudSync();
   }
 
@@ -136,9 +198,11 @@
     if (!window.HomeCleanerCloud) return;
 
     try {
-      appliances = await window.HomeCleanerCloud.initialize(appliances);
+      appliances = (await window.HomeCleanerCloud.initialize(appliances, loadDeletionQueue())).map(normalizeApplianceHistory);
       cloudReady = true;
+      localStorage.setItem(ACTIVE_USER_KEY, window.HomeCleanerCloud.user.id);
       persist(false);
+      localStorage.removeItem(LEGACY_STORAGE_KEY);
       render();
     } catch (error) {
       window.HomeCleanerCloud.reportError(error);
@@ -154,24 +218,28 @@
 
   function renderAccountState(account) {
     const pendingEmail = account.pendingEmail || (!account.emailConfirmed ? account.email : "");
-    const awaitingConfirmation = Boolean(pendingEmail) && !account.emailConfirmed;
+    const awaitingConfirmation = Boolean(pendingEmail);
     const connected = !account.isAnonymous && account.emailConfirmed && Boolean(account.email);
-    elements.emailAuthFields.classList.toggle("hidden", connected);
+    const showAuthFields = account.isAnonymous || !account.emailConfirmed;
+    elements.emailAuthFields.classList.toggle("hidden", !showAuthFields);
+    elements.accountManagement.classList.toggle("hidden", !connected);
     elements.accountEmailStatus.classList.toggle("hidden", !connected && !awaitingConfirmation);
     elements.resendEmailButton.classList.toggle("hidden", !awaitingConfirmation);
+
+    if (awaitingConfirmation) {
+      elements.accountTitle.textContent = connected ? "Подтвердите новый email" : "Подтвердите email";
+      elements.accountDescription.textContent = connected
+        ? "Откройте ссылку из письма — после подтверждения новый адрес появится в приложении."
+        : "Откройте ссылку из письма, затем вернитесь сюда и нажмите «У меня уже есть аккаунт».";
+      elements.accountEmailStatus.textContent = pendingEmail;
+      elements.accountEmailInput.value = pendingEmail;
+      return;
+    }
 
     if (connected) {
       elements.accountTitle.textContent = "Email подключён";
       elements.accountDescription.textContent = "Данные можно восстановить после переустановки и использовать на другом устройстве.";
       elements.accountEmailStatus.textContent = account.email;
-      return;
-    }
-
-    if (awaitingConfirmation) {
-      elements.accountTitle.textContent = "Подтвердите email";
-      elements.accountDescription.textContent = "Откройте ссылку из письма, затем вернитесь сюда и нажмите «У меня уже есть аккаунт».";
-      elements.accountEmailStatus.textContent = pendingEmail;
-      elements.accountEmailInput.value = pendingEmail;
       return;
     }
 
@@ -182,6 +250,7 @@
 
   async function registerEmailAccount(event) {
     event.preventDefault();
+    if (elements.emailAuthFields.classList.contains("hidden")) return;
     const credentials = accountCredentials();
     if (!credentials) return;
 
@@ -204,15 +273,9 @@
     setAccountBusy(true, "Вход…");
     try {
       const result = await window.HomeCleanerCloud.signInWithEmail(credentials.email, credentials.password);
-      if (result.changedUser && appliances.length) {
-        const now = new Date().toISOString();
-        appliances = appliances.map((item) => ({
-          ...item,
-          id: createId(),
-          createdAt: item.createdAt || now,
-          updatedAt: now
-        }));
-        persist(false);
+      if (result.changedUser) {
+        appliances = [];
+        localStorage.removeItem(ACTIVE_USER_KEY);
       }
       await initializeCloudSync();
       renderAccountState(window.HomeCleanerCloud.account);
@@ -243,6 +306,103 @@
     }
   }
 
+  async function sendPasswordReset() {
+    const email = elements.accountEmailInput.value.trim().toLowerCase();
+    if (!email || !elements.accountEmailInput.reportValidity()) return;
+    setAccountBusy(true, "Отправка…");
+    try {
+      await window.HomeCleanerCloud.sendPasswordReset(email);
+      showToast("Ссылка для восстановления отправлена");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function changeAccountEmail() {
+    const email = elements.newEmailInput.value.trim().toLowerCase();
+    if (!email || !elements.newEmailInput.reportValidity()) return;
+    setAccountBusy(true, "Сохранение…");
+    try {
+      await window.HomeCleanerCloud.changeEmail(email);
+      renderAccountState(window.HomeCleanerCloud.account);
+      showToast("Подтвердите новый email по ссылке из письма");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function changeAccountPassword() {
+    if (!elements.newPasswordInput.reportValidity() || !elements.newPasswordInput.value) return;
+    setAccountBusy(true, "Сохранение…");
+    try {
+      await window.HomeCleanerCloud.changePassword(elements.newPasswordInput.value);
+      elements.newPasswordInput.value = "";
+      showToast("Пароль изменён");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function signOutAccount() {
+    if (!window.confirm("Выйти из аккаунта на этом устройстве?")) return;
+    setAccountBusy(true, "Выход…");
+    try {
+      await window.HomeCleanerCloud.signOutUser();
+      appliances = [];
+      localStorage.removeItem(ACTIVE_USER_KEY);
+      cloudReady = false;
+      render();
+      await initializeCloudSync();
+      elements.accountDialog.close();
+      showToast("Вы вышли из аккаунта");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function deleteAccount() {
+    const confirmed = window.confirm("Удалить аккаунт, всю технику, историю и подписки? Это действие нельзя отменить.");
+    if (!confirmed) return;
+    setAccountBusy(true, "Удаление…");
+    try {
+      const deletedUserId = window.HomeCleanerCloud.user?.id;
+      await window.HomeCleanerCloud.deleteAccount();
+      if (deletedUserId) {
+        localStorage.removeItem(`${STORAGE_PREFIX}${deletedUserId}`);
+        clearDeletionQueue(deletedUserId);
+      }
+      appliances = [];
+      localStorage.removeItem(ACTIVE_USER_KEY);
+      cloudReady = false;
+      render();
+      await initializeCloudSync();
+      elements.accountDialog.close();
+      showToast("Аккаунт и облачные данные удалены");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function syncNow() {
+    setAccountBusy(true, "Синхронизация…");
+    try {
+      await initializeCloudSync();
+      showToast("Синхронизация завершена");
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
   function handleAuthRedirectError() {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const errorCode = params.get("error_code");
@@ -267,9 +427,15 @@
   function setAccountBusy(busy, label = "Создать аккаунт") {
     elements.registerEmailButton.disabled = busy;
     elements.signInEmailButton.disabled = busy;
+    elements.resetPasswordButton.disabled = busy;
     elements.accountEmailInput.disabled = busy;
     elements.accountPasswordInput.disabled = busy;
     elements.resendEmailButton.disabled = busy;
+    elements.changeEmailButton.disabled = busy;
+    elements.changePasswordButton.disabled = busy;
+    elements.syncNowButton.disabled = busy;
+    elements.signOutButton.disabled = busy;
+    elements.deleteAccountButton.disabled = busy;
     elements.registerEmailButton.textContent = busy ? label : "Создать аккаунт";
   }
 
@@ -339,7 +505,7 @@
   function renderCard(appliance) {
     const category = categories[appliance.category] || categories.other;
     const status = statusFor(appliance);
-    const cleanCount = Array.isArray(appliance.records) ? appliance.records.length : 0;
+    const cleanCount = appliance.records.length;
 
     return `
       <article class="appliance-card">
@@ -353,9 +519,8 @@
         </div>
         <div class="card-actions">
           <button class="card-action" type="button" data-action="clean" data-id="${appliance.id}">✓ Очищено</button>
-          <button class="card-action secondary" type="button" data-action="edit" data-id="${appliance.id}">
-            ${cleanCount ? `История: ${cleanCount}` : "Изменить"}
-          </button>
+          <button class="card-action secondary" type="button" data-action="history" data-id="${appliance.id}">История: ${cleanCount}</button>
+          <button class="card-action secondary" type="button" data-action="edit" data-id="${appliance.id}">Изменить</button>
         </div>
       </article>`;
   }
@@ -387,9 +552,12 @@
       lastCleaned: elements.lastCleaned.value,
       interval: clamp(Number(elements.interval.value), 1, 730),
       createdAt: existing?.createdAt || new Date().toISOString(),
-      records: existing?.records || [],
+      records: existing?.records || [recordTimestamp(elements.lastCleaned.value)],
       updatedAt: new Date().toISOString()
     };
+    const normalizedItem = normalizeApplianceHistory(item);
+    item.records = normalizedItem.records;
+    item.lastCleaned = normalizedItem.records[0].slice(0, 10);
 
     if (!item.name) return;
 
@@ -408,10 +576,14 @@
     const appliance = appliances.find((item) => item.id === id);
     if (!appliance || !window.confirm(`Удалить «${appliance.name}» вместе с историей?`)) return;
 
+    queueDeletion(id);
     appliances = appliances.filter((item) => item.id !== id);
     persist();
     if (cloudReady) {
-      window.HomeCleanerCloud.remove(id).catch(window.HomeCleanerCloud.reportError);
+      const userId = window.HomeCleanerCloud.user?.id;
+      window.HomeCleanerCloud.remove(id)
+        .then(() => clearQueuedDeletion(userId, id))
+        .catch(window.HomeCleanerCloud.reportError);
     }
     render();
     elements.dialog.close();
@@ -430,15 +602,132 @@
       return;
     }
 
+    if (button.dataset.action === "history") {
+      openHistory(appliance);
+      return;
+    }
+
     if (button.dataset.action === "clean") {
       const now = new Date();
       appliance.lastCleaned = toDateInput(now);
-      appliance.records = [now.toISOString(), ...(appliance.records || [])].slice(0, 100);
+      appliance.records = [now.toISOString(), ...normalizedRecords(appliance)
+        .filter((record) => record.slice(0, 10) !== appliance.lastCleaned)].slice(0, 100);
       appliance.updatedAt = now.toISOString();
       persist();
       render();
       showToast(`«${appliance.name}» отмечена как очищенная`);
     }
+  }
+
+  function loadDeletionQueue() {
+    try {
+      const value = JSON.parse(localStorage.getItem(DELETION_QUEUE_KEY) || "{}");
+      return value && typeof value === "object" ? value : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function queueDeletion(id) {
+    const userId = window.HomeCleanerCloud?.user?.id;
+    if (!userId) return;
+    const queue = loadDeletionQueue();
+    queue[userId] = [...new Set([...(queue[userId] || []), id])];
+    localStorage.setItem(DELETION_QUEUE_KEY, JSON.stringify(queue));
+  }
+
+  function clearQueuedDeletion(userId, id) {
+    if (!userId) return;
+    const queue = loadDeletionQueue();
+    queue[userId] = (queue[userId] || []).filter((current) => current !== id);
+    if (!queue[userId].length) delete queue[userId];
+    localStorage.setItem(DELETION_QUEUE_KEY, JSON.stringify(queue));
+  }
+
+  function clearDeletionQueue(userId) {
+    if (!userId) return;
+    const queue = loadDeletionQueue();
+    delete queue[userId];
+    localStorage.setItem(DELETION_QUEUE_KEY, JSON.stringify(queue));
+  }
+
+  function openHistory(appliance) {
+    historyApplianceId = appliance.id;
+    elements.historyTitle.textContent = appliance.name;
+    elements.historyDateInput.value = toDateInput(new Date());
+    elements.historyDateInput.max = toDateInput(new Date());
+    renderHistory(appliance);
+    elements.historyDialog.showModal();
+  }
+
+  function renderHistory(appliance) {
+    const records = normalizedRecords(appliance);
+    elements.historyList.innerHTML = records.length
+      ? records.map((record) => {
+          const date = record.slice(0, 10);
+          return `<div class="history-row">
+            <time datetime="${date}">${formatDate(parseLocalDate(date))}</time>
+            <button class="history-delete" type="button" data-date="${date}" ${records.length === 1 ? "disabled" : ""}>Удалить</button>
+          </div>`;
+        }).join("")
+      : '<p class="history-empty">Записей пока нет</p>';
+  }
+
+  function addHistoryDate(event) {
+    event.preventDefault();
+    const appliance = appliances.find((item) => item.id === historyApplianceId);
+    const date = elements.historyDateInput.value;
+    if (!appliance || !date) return;
+    const dates = new Set(normalizedRecords(appliance).map((record) => record.slice(0, 10)));
+    if (dates.has(date)) {
+      showToast("Эта дата уже есть в истории");
+      return;
+    }
+    appliance.records = [recordTimestamp(date), ...appliance.records];
+    updateFromHistory(appliance);
+    showToast("Дата добавлена");
+  }
+
+  function deleteHistoryDate(event) {
+    const button = event.target.closest("button[data-date]");
+    if (!button || button.disabled) return;
+    const appliance = appliances.find((item) => item.id === historyApplianceId);
+    if (!appliance) return;
+    appliance.records = normalizedRecords(appliance).filter((record) => record.slice(0, 10) !== button.dataset.date);
+    updateFromHistory(appliance);
+    showToast("Запись удалена");
+  }
+
+  function updateFromHistory(appliance) {
+    appliance.records = normalizedRecords(appliance);
+    appliance.lastCleaned = appliance.records[0].slice(0, 10);
+    appliance.updatedAt = new Date().toISOString();
+    persist();
+    render();
+    renderHistory(appliance);
+  }
+
+  function normalizeApplianceHistory(item) {
+    const records = normalizedRecords(item);
+    const lastCleaned = item.lastCleaned || toDateInput(new Date());
+    if (!records.some((record) => record.slice(0, 10) === lastCleaned)) {
+      records.push(recordTimestamp(lastCleaned));
+      records.sort().reverse();
+    }
+    return { ...item, lastCleaned, records };
+  }
+
+  function normalizedRecords(item) {
+    const unique = new Map();
+    for (const value of Array.isArray(item.records) ? item.records : []) {
+      const date = String(value).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) unique.set(date, recordTimestamp(date));
+    }
+    return [...unique.values()].sort().reverse();
+  }
+
+  function recordTimestamp(date) {
+    return new Date(`${date}T12:00:00`).toISOString();
   }
 
   function applySuggestedInterval() {
@@ -472,13 +761,19 @@
     }
 
     if (!isStandalone() && isIOS()) {
+      elements.notificationDialog.close();
       elements.installDialog.showModal();
       return;
     }
 
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
-      const pushEnabled = await subscribeToPush();
+      const hour = notificationHour();
+      const leadDays = notificationLeadDays();
+      localStorage.setItem(NOTIFICATION_HOUR_KEY, String(hour));
+      localStorage.setItem(NOTIFICATION_LEAD_KEY, String(leadDays));
+      const pushEnabled = await subscribeToPush(hour, leadDays);
+      await renderNotificationSettings();
       showToast(pushEnabled ? "Фоновые напоминания включены" : "Напоминания включены при открытии");
       await checkDueNotifications(true);
     } else {
@@ -486,7 +781,49 @@
     }
   }
 
-  async function subscribeToPush() {
+  async function openNotificationSettings() {
+    const hour = Number(localStorage.getItem(NOTIFICATION_HOUR_KEY) || 10);
+    const leadDays = Number(localStorage.getItem(NOTIFICATION_LEAD_KEY) || 0);
+    elements.notificationTimeInput.value = `${String(hour).padStart(2, "0")}:00`;
+    elements.notificationLeadInput.value = String(leadDays);
+    await renderNotificationSettings();
+    elements.notificationDialog.showModal();
+  }
+
+  async function renderNotificationSettings() {
+    const subscription = await currentPushSubscription();
+    const supported = "Notification" in window;
+    const enabled = supported && Notification.permission === "granted" && Boolean(subscription);
+    elements.notificationStatus.textContent = enabled
+      ? `Фоновые напоминания включены на ${elements.notificationTimeInput.value}`
+      : supported && Notification.permission === "denied"
+        ? "Уведомления запрещены в настройках iPhone"
+        : supported
+          ? "Фоновые напоминания ещё не включены"
+          : "Этот браузер не поддерживает уведомления";
+    elements.enableNotificationButton.textContent = enabled ? "Сохранить время" : "Включить напоминания";
+    elements.disableNotificationButton.classList.toggle("hidden", !enabled);
+  }
+
+  function notificationHour() {
+    return clamp(Number(elements.notificationTimeInput.value.split(":")[0]), 0, 23);
+  }
+
+  function notificationLeadDays() {
+    return clamp(Number(elements.notificationLeadInput.value), 0, 30);
+  }
+
+  async function currentPushSubscription() {
+    if (!("serviceWorker" in navigator)) return null;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      return registration.pushManager.getSubscription();
+    } catch {
+      return null;
+    }
+  }
+
+  async function subscribeToPush(preferredHour = notificationHour(), remindDaysBefore = notificationLeadDays()) {
     if (!window.HomeCleanerCloud?.user || !("PushManager" in window)) return false;
 
     try {
@@ -498,11 +835,40 @@
           applicationServerKey: urlBase64ToUint8Array(window.HomeCleanerCloud.vapidPublicKey)
         });
       }
-      await window.HomeCleanerCloud.savePushSubscription(subscription);
+      await window.HomeCleanerCloud.savePushSubscription(subscription, preferredHour, remindDaysBefore);
       return true;
     } catch (error) {
       window.HomeCleanerCloud.reportError(error);
       return false;
+    }
+  }
+
+  async function testNotification() {
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      showToast("Сначала включите уведомления");
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    await registration.showNotification("Дом в порядке", {
+      body: "Тестовое напоминание работает.",
+      icon: "./app-icon-192.png",
+      badge: "./app-icon-192.png",
+      data: { url: "./" }
+    });
+    showToast("Тестовое уведомление отправлено");
+  }
+
+  async function disableNotifications() {
+    const subscription = await currentPushSubscription();
+    if (!subscription) return;
+    try {
+      await window.HomeCleanerCloud.removePushSubscription(subscription.endpoint);
+      await subscription.unsubscribe();
+      await renderNotificationSettings();
+      showToast("Фоновые напоминания отключены");
+    } catch (error) {
+      window.HomeCleanerCloud.reportError(error);
+      showToast("Не удалось отключить напоминания");
     }
   }
 
@@ -544,7 +910,19 @@
   async function registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     try {
-      await navigator.serviceWorker.register("./sw.js");
+      const hadController = Boolean(navigator.serviceWorker.controller);
+      let updateAvailable = false;
+      const registration = await navigator.serviceWorker.register("./sw.js");
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        worker?.addEventListener("statechange", () => {
+          if (worker.state === "installed" && hadController) updateAvailable = true;
+        });
+      });
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (hadController || updateAvailable) elements.updateBanner.classList.remove("hidden");
+      });
+      await registration.update();
     } catch (error) {
       console.warn("Service worker registration failed", error);
     }

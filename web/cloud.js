@@ -20,12 +20,15 @@
 
   let currentUser = null;
 
-  client.auth.onAuthStateChange((_event, session) => {
+  client.auth.onAuthStateChange((event, session) => {
     currentUser = session?.user || null;
     emitAuthState();
+    if (event === "PASSWORD_RECOVERY") {
+      window.dispatchEvent(new CustomEvent("homecleaner:passwordrecovery"));
+    }
   });
 
-  async function initialize(localAppliances) {
+  async function initialize(localAppliances, pendingDeletions = {}) {
     setStatus("syncing", "Подключение к облаку…");
 
     const { data: sessionData, error: sessionError } = await client.auth.getSession();
@@ -53,6 +56,17 @@
     currentUser = session?.user || null;
     if (!currentUser) throw new Error("Не удалось создать облачную сессию");
     emitAuthState();
+
+    const deletionIds = Array.isArray(pendingDeletions[currentUser.id])
+      ? pendingDeletions[currentUser.id]
+      : [];
+    if (deletionIds.length) {
+      const { error: deletionError } = await client.from("appliances").delete().in("id", deletionIds);
+      if (deletionError) throw deletionError;
+      window.dispatchEvent(new CustomEvent("homecleaner:deletionssynced", {
+        detail: { userId: currentUser.id }
+      }));
+    }
 
     const { data: rows, error: loadError } = await client
       .from("appliances")
@@ -88,7 +102,7 @@
     setStatus("synced", "Сохранено в облаке");
   }
 
-  async function savePushSubscription(subscription) {
+  async function savePushSubscription(subscription, preferredHour = 10, remindDaysBefore = 0) {
     if (!currentUser) throw new Error("Облачная сессия ещё не готова");
 
     const value = subscription.toJSON();
@@ -98,7 +112,8 @@
       p256dh: value.keys?.p256dh,
       auth_key: value.keys?.auth,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Moscow",
-      preferred_hour: 10,
+      preferred_hour: Math.max(0, Math.min(23, Number(preferredHour) || 0)),
+      remind_days_before: Math.max(0, Math.min(30, Number(remindDaysBefore) || 0)),
       updated_at: new Date().toISOString()
     };
 
@@ -144,6 +159,49 @@
       options: { emailRedirectTo: APP_URL }
     });
     if (error) throw error;
+  }
+
+  async function removePushSubscription(endpoint) {
+    if (!currentUser || !endpoint) return;
+    const { error } = await client.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    if (error) throw error;
+  }
+
+  async function sendPasswordReset(email) {
+    const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo: APP_URL });
+    if (error) throw error;
+  }
+
+  async function changeEmail(email) {
+    const { data, error } = await client.auth.updateUser(
+      { email },
+      { emailRedirectTo: APP_URL }
+    );
+    if (error) throw error;
+    currentUser = data.user || currentUser;
+    emitAuthState();
+  }
+
+  async function changePassword(password) {
+    const { data, error } = await client.auth.updateUser({ password });
+    if (error) throw error;
+    currentUser = data.user || currentUser;
+    emitAuthState();
+  }
+
+  async function signOutUser() {
+    const { error } = await client.auth.signOut({ scope: "local" });
+    if (error) throw error;
+    currentUser = null;
+    emitAuthState();
+  }
+
+  async function deleteAccount() {
+    const { error } = await client.functions.invoke("delete-account", { body: {} });
+    if (error) throw error;
+    await client.auth.signOut({ scope: "local" });
+    currentUser = null;
+    emitAuthState();
   }
 
   function mergeAppliances(localItems, remoteRows) {
@@ -206,7 +264,6 @@
   }
 
   function emitAuthState() {
-    if (!currentUser) return;
     window.dispatchEvent(new CustomEvent("homecleaner:authstate", {
       detail: accountState()
     }));
@@ -214,7 +271,7 @@
 
   function accountState() {
     return {
-      isAnonymous: currentUser?.is_anonymous === true,
+      isAnonymous: !currentUser || currentUser.is_anonymous === true,
       email: currentUser?.email || currentUser?.new_email || "",
       pendingEmail: currentUser?.new_email || "",
       emailConfirmed: Boolean(currentUser?.email_confirmed_at)
@@ -250,9 +307,15 @@
     save,
     remove,
     savePushSubscription,
+    removePushSubscription,
     registerWithEmail,
     signInWithEmail,
     resendEmailConfirmation,
+    sendPasswordReset,
+    changeEmail,
+    changePassword,
+    signOutUser,
+    deleteAccount,
     reportError,
     vapidPublicKey: VAPID_PUBLIC_KEY,
     get client() { return client; },

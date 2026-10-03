@@ -6,7 +6,7 @@
   "scripts": {
     "build:vendor": "node scripts/copy-vendor.mjs",
     "generate:vapid": "node scripts/generate-vapid.mjs",
-    "check": "node --check web/app.js && node --check web/cloud.js && node --check web/sw.js"
+    "check": "node --check web/app.js && node --check web/cloud.js && node --check web/sw.js && node scripts/check-web.mjs"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.117.2"

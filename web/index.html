@@ -91,6 +91,50 @@
       </form>
     </dialog>
 
+    <dialog class="sheet" id="historyDialog">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <button class="text-button" id="closeHistoryButton" type="button">Закрыть</button>
+        <h2 id="historyTitle">История чисток</h2>
+        <span class="sheet-header-spacer" aria-hidden="true"></span>
+      </div>
+
+      <form class="history-add" id="historyForm">
+        <label class="field">
+          <span>Добавить дату чистки</span>
+          <input id="historyDateInput" type="date" required>
+        </label>
+        <button class="primary-button" type="submit">Добавить</button>
+      </form>
+      <div class="history-list" id="historyList"></div>
+    </dialog>
+
+    <dialog class="sheet compact-sheet" id="notificationDialog">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="install-content">
+        <div class="install-icon" aria-hidden="true">🔔</div>
+        <h2>Настройки напоминаний</h2>
+        <p class="settings-description" id="notificationStatus">Уведомления ещё не настроены</p>
+        <label class="field account-field notification-time-field">
+          <span>Напоминать ежедневно в</span>
+          <input id="notificationTimeInput" type="time" value="10:00" step="3600">
+        </label>
+        <label class="field account-field">
+          <span>Когда напоминать</span>
+          <select id="notificationLeadInput">
+            <option value="0">В день чистки</option>
+            <option value="1">За 1 день</option>
+            <option value="3">За 3 дня</option>
+            <option value="7">За 7 дней</option>
+          </select>
+        </label>
+        <button class="primary-button" id="enableNotificationButton" type="button">Включить напоминания</button>
+        <button class="secondary-button" id="testNotificationButton" type="button">Проверить уведомление</button>
+        <button class="danger-button hidden" id="disableNotificationButton" type="button">Отключить напоминания</button>
+        <button class="secondary-button" id="closeNotificationButton" type="button">Закрыть</button>
+      </div>
+    </dialog>
+
     <dialog class="sheet compact-sheet" id="installDialog">
       <div class="sheet-handle" aria-hidden="true"></div>
       <div class="install-content">
@@ -124,15 +168,39 @@
 
           <button class="primary-button account-primary" id="registerEmailButton" type="submit">Создать аккаунт</button>
           <button class="secondary-button" id="signInEmailButton" type="button">У меня уже есть аккаунт</button>
+          <button class="secondary-button" id="resetPasswordButton" type="button">Восстановить пароль</button>
         </div>
 
         <p class="account-email hidden" id="accountEmailStatus"></p>
         <button class="secondary-button hidden" id="resendEmailButton" type="button">Отправить письмо повторно</button>
+
+        <div class="account-management hidden" id="accountManagement">
+          <label class="field account-field">
+            <span>Новый email</span>
+            <input id="newEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="new@example.com">
+          </label>
+          <button class="secondary-button" id="changeEmailButton" type="button">Изменить email</button>
+
+          <label class="field account-field account-management-field">
+            <span>Новый пароль</span>
+            <input id="newPasswordInput" type="password" minlength="8" autocomplete="new-password" placeholder="Минимум 8 символов">
+          </label>
+          <button class="secondary-button" id="changePasswordButton" type="button">Изменить пароль</button>
+          <button class="secondary-button" id="syncNowButton" type="button">Синхронизировать сейчас</button>
+          <button class="secondary-button" id="signOutButton" type="button">Выйти из аккаунта</button>
+          <button class="danger-button" id="deleteAccountButton" type="button">Удалить аккаунт и данные</button>
+        </div>
+
         <button class="secondary-button" id="closeAccountButton" type="button">Закрыть</button>
+        <a class="privacy-link" href="./privacy.html" target="_blank" rel="noopener">Конфиденциальность</a>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="update-banner hidden" id="updateBanner" role="status">
+      <span>Доступна новая версия</span>
+      <button id="reloadAppButton" type="button">Обновить</button>
+    </div>
 
     <script src="./vendor/supabase.js" defer></script>
     <script src="./cloud.js" defer></script>

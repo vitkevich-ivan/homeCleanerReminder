@@ -9,6 +9,7 @@ type SubscriptionRow = {
   auth_key: string;
   timezone: string;
   preferred_hour: number;
+  remind_days_before?: number;
 };
 
 type ApplianceRow = {
@@ -58,7 +59,7 @@ Deno.serve(async (request) => {
 
   const { data, error } = await supabase
     .from("push_subscriptions")
-    .select("id,user_id,endpoint,p256dh,auth_key,timezone,preferred_hour");
+    .select("*");
 
   if (error) return serverError(error.message);
 
@@ -90,7 +91,8 @@ Deno.serve(async (request) => {
 
     for (const subscription of activeSubscriptions) {
       const localToday = localDateParts(subscription.timezone).date;
-      const due = appliances.filter((appliance) => dueDate(appliance) <= localToday);
+      const reminderBoundary = addDays(localToday, subscription.remind_days_before || 0);
+      const due = appliances.filter((appliance) => dueDate(appliance) <= reminderBoundary);
       if (!due.length) continue;
 
       const { data: delivered } = await supabase
@@ -162,6 +164,12 @@ function localDateParts(timezone: string): { date: string; hour: number } {
 function dueDate(appliance: ApplianceRow): string {
   const date = new Date(`${appliance.last_cleaned}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + appliance.interval_days);
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
 

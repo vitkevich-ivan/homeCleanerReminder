@@ -440,6 +440,10 @@ h2 {
   font-size: 17px;
 }
 
+.sheet-header-spacer {
+  width: 48px;
+}
+
 .field {
   display: block;
   margin-bottom: 12px;
@@ -577,12 +581,114 @@ h2 {
   margin-top: 4px;
 }
 
+.account-management {
+  margin-top: 14px;
+  padding-top: 5px;
+  border-top: 1px solid var(--line);
+}
+
+.account-management-field {
+  margin-top: 14px;
+}
+
+.privacy-link {
+  display: inline-block;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.legal-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: calc(30px + env(safe-area-inset-top)) 20px 50px;
+  line-height: 1.6;
+}
+
+.legal-page h1 {
+  margin: 20px 0;
+}
+
+.legal-page p + p {
+  margin-top: 15px;
+}
+
+.legal-page a {
+  color: var(--accent);
+}
+
+.history-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.history-add .field,
+.history-add .primary-button {
+  margin: 0;
+}
+
+.history-add .primary-button {
+  width: auto;
+  padding: 0 18px;
+}
+
+.history-list {
+  display: grid;
+  max-height: min(48vh, 420px);
+  margin-top: 18px;
+  overflow-y: auto;
+  gap: 8px;
+}
+
+.history-row {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-solid);
+}
+
+.history-row time {
+  font-weight: 650;
+}
+
+.history-delete {
+  padding: 7px;
+  border: 0;
+  color: var(--red);
+  background: transparent;
+  font-weight: 650;
+}
+
+.history-empty {
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+
 .install-icon {
   font-size: 44px;
 }
 
 .install-content h2 {
   margin-top: 12px;
+}
+
+.settings-description {
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.notification-time-field {
+  margin-top: 18px;
+  text-align: left;
 }
 
 .install-content ol {
@@ -617,6 +723,38 @@ h2 {
 .toast.visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.update-banner {
+  position: fixed;
+  z-index: 20;
+  right: 18px;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  left: 18px;
+  display: flex;
+  max-width: 520px;
+  min-height: 54px;
+  margin: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px 9px 16px;
+  border-radius: 16px;
+  color: #ffffff;
+  background: #1c253a;
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.update-banner button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 11px;
+  color: var(--accent-dark);
+  background: #ffffff;
+  font-weight: 750;
 }
 
 @media (min-width: 620px) {
@@ -666,7 +804,7 @@ h2 {
 
   .card-actions {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
   }
 
   .card-action {
@@ -677,6 +815,15 @@ h2 {
 
   .card-action.secondary {
     margin-left: 0;
+  }
+
+  .history-add {
+    grid-template-columns: 1fr;
+  }
+
+  .history-add .primary-button {
+    width: 100%;
+    min-height: 46px;
   }
 }
 
@@ -692,7 +839,7 @@ h2 {
   }
 
   .card-actions {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .card-action.secondary {
