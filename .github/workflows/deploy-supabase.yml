@@ -1,6 +1,11 @@
 name: Deploy Supabase Push Function
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/**"
+      - ".github/workflows/deploy-supabase.yml"
   workflow_dispatch:
 
 permissions:
