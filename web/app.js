@@ -321,10 +321,31 @@
 
     const permission = await Notification.requestPermission();
     if (permission === "granted") {
-      showToast("Напоминания включены");
+      const pushEnabled = await subscribeToPush();
+      showToast(pushEnabled ? "Фоновые напоминания включены" : "Напоминания включены при открытии");
       await checkDueNotifications(true);
     } else {
       showToast("Уведомления не разрешены");
+    }
+  }
+
+  async function subscribeToPush() {
+    if (!window.HomeCleanerCloud?.user || !("PushManager" in window)) return false;
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(window.HomeCleanerCloud.vapidPublicKey)
+        });
+      }
+      await window.HomeCleanerCloud.savePushSubscription(subscription);
+      return true;
+    } catch (error) {
+      window.HomeCleanerCloud.reportError(error);
+      return false;
     }
   }
 
@@ -382,6 +403,13 @@
 
   function createId() {
     return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function urlBase64ToUint8Array(value) {
+    const padding = "=".repeat((4 - value.length % 4) % 4);
+    const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = atob(base64);
+    return Uint8Array.from(bytes, (character) => character.charCodeAt(0));
   }
 
   function parseLocalDate(value) {

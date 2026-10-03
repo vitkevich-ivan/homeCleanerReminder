@@ -3,6 +3,7 @@
 
   const SUPABASE_URL = "https://vptyxdhkqklgjaowbrcj.supabase.co";
   const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_rHDFNariizbk0p1qYfygIQ_1hbLMoof";
+  const VAPID_PUBLIC_KEY = "BL-1ATl6rBVG5E4rfcn2flQw4t8ZaZrAXkhLLr8MVk9RtzOdU54VrbLCEdxABz7BZJ6KzordTfBLCXQxLfFLEp0";
 
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
@@ -66,6 +67,27 @@
     const { error } = await client.from("appliances").delete().eq("id", id);
     if (error) throw error;
     setStatus("synced", "Сохранено в облаке");
+  }
+
+  async function savePushSubscription(subscription) {
+    if (!currentUser) throw new Error("Облачная сессия ещё не готова");
+
+    const value = subscription.toJSON();
+    const row = {
+      user_id: currentUser.id,
+      endpoint: value.endpoint,
+      p256dh: value.keys?.p256dh,
+      auth_key: value.keys?.auth,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Moscow",
+      preferred_hour: 10,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await client
+      .from("push_subscriptions")
+      .upsert(row, { onConflict: "endpoint" });
+
+    if (error) throw error;
   }
 
   function mergeAppliances(localItems, remoteRows) {
@@ -144,7 +166,9 @@
     initialize,
     save,
     remove,
+    savePushSubscription,
     reportError,
+    vapidPublicKey: VAPID_PUBLIC_KEY,
     get client() { return client; },
     get user() { return currentUser; }
   };
