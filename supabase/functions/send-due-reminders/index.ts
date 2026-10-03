@@ -36,6 +36,8 @@ Deno.serve(async (request) => {
     });
   }
 
+  const forceSend = request.headers.get("x-force-send") === "true";
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
@@ -74,7 +76,7 @@ Deno.serve(async (request) => {
   for (const [userId, userSubscriptions] of byUser) {
     const activeSubscriptions = userSubscriptions.filter((subscription) => {
       const local = localDateParts(subscription.timezone);
-      return local.hour === subscription.preferred_hour;
+      return forceSend || local.hour === subscription.preferred_hour;
     });
     if (!activeSubscriptions.length) continue;
 
