@@ -105,6 +105,32 @@
       </div>
     </dialog>
 
+    <dialog class="sheet compact-sheet" id="accountDialog">
+      <form class="account-content" id="accountForm">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="account-icon" aria-hidden="true">✉️</div>
+        <h2 id="accountTitle">Защитите свои данные</h2>
+        <p id="accountDescription">Добавьте email, чтобы восстановить технику и историю после переустановки.</p>
+
+        <div id="emailAuthFields">
+          <label class="field account-field">
+            <span>Email</span>
+            <input id="accountEmailInput" type="email" inputmode="email" autocomplete="email" placeholder="name@example.com" required>
+          </label>
+          <label class="field account-field">
+            <span>Пароль</span>
+            <input id="accountPasswordInput" type="password" minlength="8" autocomplete="current-password" placeholder="Минимум 8 символов" required>
+          </label>
+
+          <button class="primary-button account-primary" id="registerEmailButton" type="submit">Создать аккаунт</button>
+          <button class="secondary-button" id="signInEmailButton" type="button">У меня уже есть аккаунт</button>
+        </div>
+
+        <p class="account-email hidden" id="accountEmailStatus"></p>
+        <button class="secondary-button" id="closeAccountButton" type="button">Закрыть</button>
+      </form>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="./vendor/supabase.js" defer></script>

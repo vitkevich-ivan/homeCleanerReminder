@@ -9,7 +9,7 @@
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: true,
       storageKey: "home-cleaner-auth"
     },
     global: {
@@ -18,6 +18,11 @@
   });
 
   let currentUser = null;
+
+  client.auth.onAuthStateChange((_event, session) => {
+    currentUser = session?.user || null;
+    emitAuthState();
+  });
 
   async function initialize(localAppliances) {
     setStatus("syncing", "Подключение к облаку…");
@@ -34,6 +39,7 @@
 
     currentUser = session?.user || null;
     if (!currentUser) throw new Error("Не удалось создать облачную сессию");
+    emitAuthState();
 
     const { data: rows, error: loadError } = await client
       .from("appliances")
@@ -88,6 +94,35 @@
       .upsert(row, { onConflict: "endpoint" });
 
     if (error) throw error;
+  }
+
+  async function registerWithEmail(email, password) {
+    if (!currentUser) throw new Error("Облачная сессия ещё не готова");
+    if (!currentUser.is_anonymous) throw new Error("Email уже подключён к аккаунту");
+
+    const redirectTo = `${window.location.origin}${window.location.pathname}`;
+    const { data, error } = await client.auth.updateUser(
+      { email, password },
+      { emailRedirectTo: redirectTo }
+    );
+    if (error) throw error;
+
+    currentUser = data.user || currentUser;
+    emitAuthState();
+    return {
+      email: currentUser.new_email || currentUser.email || email,
+      confirmationRequired: !currentUser.email_confirmed_at
+    };
+  }
+
+  async function signInWithEmail(email, password) {
+    const previousUserId = currentUser?.id || null;
+    const { data, error } = await client.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    currentUser = data.user;
+    emitAuthState();
+    return { changedUser: Boolean(previousUserId && previousUserId !== currentUser.id) };
   }
 
   function mergeAppliances(localItems, remoteRows) {
@@ -149,6 +184,22 @@
     }));
   }
 
+  function emitAuthState() {
+    if (!currentUser) return;
+    window.dispatchEvent(new CustomEvent("homecleaner:authstate", {
+      detail: accountState()
+    }));
+  }
+
+  function accountState() {
+    return {
+      isAnonymous: currentUser?.is_anonymous === true,
+      email: currentUser?.email || currentUser?.new_email || "",
+      pendingEmail: currentUser?.new_email || "",
+      emailConfirmed: Boolean(currentUser?.email_confirmed_at)
+    };
+  }
+
   function reportError(error) {
     const schemaMissing = error?.code === "PGRST205" || error?.code === "42P01";
     const authDisabled = /anonymous sign-ins are disabled/i.test(error?.message || "");
@@ -167,9 +218,12 @@
     save,
     remove,
     savePushSubscription,
+    registerWithEmail,
+    signInWithEmail,
     reportError,
     vapidPublicKey: VAPID_PUBLIC_KEY,
     get client() { return client; },
-    get user() { return currentUser; }
+    get user() { return currentUser; },
+    get account() { return accountState(); }
   };
 })();

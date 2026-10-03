@@ -512,6 +512,71 @@ h2 {
   text-align: center;
 }
 
+.account-content {
+  padding: 4px 8px 0;
+  text-align: center;
+}
+
+.account-icon {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  margin: 10px auto 0;
+  place-items: center;
+  border-radius: 22px;
+  background: var(--accent-soft);
+  font-size: 31px;
+}
+
+.account-content h2 {
+  margin-top: 14px;
+}
+
+.account-content > p {
+  max-width: 390px;
+  margin: 9px auto 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+#emailAuthFields {
+  margin-top: 20px;
+}
+
+.account-field {
+  text-align: left;
+}
+
+.account-email {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  color: var(--green) !important;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.secondary-button {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 9px;
+  border: 0;
+  border-radius: 15px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 750;
+}
+
+.secondary-button:disabled,
+.account-primary:disabled {
+  opacity: 0.55;
+}
+
+.account-primary {
+  margin-top: 4px;
+}
+
 .install-icon {
   font-size: 44px;
 }

@@ -35,6 +35,17 @@
     cancelFormButton: document.querySelector("#cancelFormButton"),
     installDialog: document.querySelector("#installDialog"),
     closeInstallButton: document.querySelector("#closeInstallButton"),
+    accountDialog: document.querySelector("#accountDialog"),
+    accountForm: document.querySelector("#accountForm"),
+    accountTitle: document.querySelector("#accountTitle"),
+    accountDescription: document.querySelector("#accountDescription"),
+    emailAuthFields: document.querySelector("#emailAuthFields"),
+    accountEmailInput: document.querySelector("#accountEmailInput"),
+    accountPasswordInput: document.querySelector("#accountPasswordInput"),
+    registerEmailButton: document.querySelector("#registerEmailButton"),
+    signInEmailButton: document.querySelector("#signInEmailButton"),
+    accountEmailStatus: document.querySelector("#accountEmailStatus"),
+    closeAccountButton: document.querySelector("#closeAccountButton"),
     toast: document.querySelector("#toast")
   };
 
@@ -69,9 +80,10 @@
     elements.installButton.addEventListener("click", handleInstall);
     elements.closeInstallButton.addEventListener("click", () => elements.installDialog.close());
     elements.notificationButton.addEventListener("click", enableNotifications);
-    elements.syncStatus.addEventListener("click", () => {
-      showToast(elements.syncStatus.dataset.detail || elements.syncStatusLabel.textContent);
-    });
+    elements.syncStatus.addEventListener("click", openAccountDialog);
+    elements.closeAccountButton.addEventListener("click", () => elements.accountDialog.close());
+    elements.accountForm.addEventListener("submit", registerEmailAccount);
+    elements.signInEmailButton.addEventListener("click", signInEmailAccount);
 
     window.addEventListener("homecleaner:cloudstatus", (event) => {
       const { state, label, detail } = event.detail;
@@ -79,6 +91,10 @@
       elements.syncStatusLabel.textContent = label;
       elements.syncStatus.dataset.detail = detail || label;
       elements.syncStatus.title = detail || label;
+    });
+
+    window.addEventListener("homecleaner:authstate", (event) => {
+      renderAccountState(event.detail);
     });
 
     window.addEventListener("beforeinstallprompt", (event) => {
@@ -124,6 +140,109 @@
     } catch (error) {
       window.HomeCleanerCloud.reportError(error);
     }
+  }
+
+  function openAccountDialog() {
+    if (window.HomeCleanerCloud?.account) {
+      renderAccountState(window.HomeCleanerCloud.account);
+    }
+    elements.accountDialog.showModal();
+  }
+
+  function renderAccountState(account) {
+    const pendingEmail = account.pendingEmail || (!account.emailConfirmed ? account.email : "");
+    const awaitingConfirmation = Boolean(pendingEmail) && !account.emailConfirmed;
+    const connected = !account.isAnonymous && account.emailConfirmed && Boolean(account.email);
+    elements.emailAuthFields.classList.toggle("hidden", connected);
+    elements.accountEmailStatus.classList.toggle("hidden", !connected && !awaitingConfirmation);
+
+    if (connected) {
+      elements.accountTitle.textContent = "Email подключён";
+      elements.accountDescription.textContent = "Данные можно восстановить после переустановки и использовать на другом устройстве.";
+      elements.accountEmailStatus.textContent = account.email;
+      return;
+    }
+
+    if (awaitingConfirmation) {
+      elements.accountTitle.textContent = "Подтвердите email";
+      elements.accountDescription.textContent = "Откройте ссылку из письма, затем вернитесь сюда и нажмите «У меня уже есть аккаунт».";
+      elements.accountEmailStatus.textContent = pendingEmail;
+      elements.accountEmailInput.value = pendingEmail;
+      return;
+    }
+
+    elements.accountTitle.textContent = "Защитите свои данные";
+    elements.accountDescription.textContent = "Создайте email-аккаунт без смены текущего профиля или войдите в существующий.";
+    elements.accountEmailStatus.classList.add("hidden");
+  }
+
+  async function registerEmailAccount(event) {
+    event.preventDefault();
+    const credentials = accountCredentials();
+    if (!credentials) return;
+
+    setAccountBusy(true, "Создание…");
+    try {
+      const result = await window.HomeCleanerCloud.registerWithEmail(credentials.email, credentials.password);
+      renderAccountState(window.HomeCleanerCloud.account);
+      showToast(result.confirmationRequired ? "Проверьте письмо для подтверждения email" : "Email подключён");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  async function signInEmailAccount() {
+    const credentials = accountCredentials();
+    if (!credentials) return;
+
+    setAccountBusy(true, "Вход…");
+    try {
+      const result = await window.HomeCleanerCloud.signInWithEmail(credentials.email, credentials.password);
+      if (result.changedUser && appliances.length) {
+        const now = new Date().toISOString();
+        appliances = appliances.map((item) => ({
+          ...item,
+          id: createId(),
+          createdAt: item.createdAt || now,
+          updatedAt: now
+        }));
+        persist(false);
+      }
+      await initializeCloudSync();
+      renderAccountState(window.HomeCleanerCloud.account);
+      showToast("Вход выполнен");
+    } catch (error) {
+      showToast(authErrorMessage(error));
+    } finally {
+      setAccountBusy(false);
+    }
+  }
+
+  function accountCredentials() {
+    const email = elements.accountEmailInput.value.trim().toLowerCase();
+    const password = elements.accountPasswordInput.value;
+    if (!elements.accountEmailInput.reportValidity() || !elements.accountPasswordInput.reportValidity()) return null;
+    return { email, password };
+  }
+
+  function setAccountBusy(busy, label = "Создать аккаунт") {
+    elements.registerEmailButton.disabled = busy;
+    elements.signInEmailButton.disabled = busy;
+    elements.accountEmailInput.disabled = busy;
+    elements.accountPasswordInput.disabled = busy;
+    elements.registerEmailButton.textContent = busy ? label : "Создать аккаунт";
+  }
+
+  function authErrorMessage(error) {
+    const code = error?.code || "";
+    if (code === "invalid_credentials") return "Неверный email или пароль";
+    if (code === "email_not_confirmed") return "Сначала подтвердите email по ссылке из письма";
+    if (code === "user_already_exists" || /already registered/i.test(error?.message || "")) {
+      return "Этот email уже зарегистрирован — нажмите «У меня уже есть аккаунт»";
+    }
+    return error?.message || "Не удалось выполнить вход";
   }
 
   function scheduleCloudSync() {
