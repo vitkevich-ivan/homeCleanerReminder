@@ -32,6 +32,18 @@
     if (sessionError) throw sessionError;
 
     let session = sessionData.session;
+    if (session) {
+      const { data: userData, error: userError } = await client.auth.getUser();
+      if (userError && isInvalidUserSession(userError)) {
+        await client.auth.signOut({ scope: "local" });
+        session = null;
+      } else if (userError) {
+        throw userError;
+      } else if (userData.user) {
+        session = { ...session, user: userData.user };
+      }
+    }
+
     if (!session) {
       const { data, error } = await client.auth.signInAnonymously();
       if (error) throw error;
@@ -207,6 +219,17 @@
       pendingEmail: currentUser?.new_email || "",
       emailConfirmed: Boolean(currentUser?.email_confirmed_at)
     };
+  }
+
+  function isInvalidUserSession(error) {
+    const invalidCodes = new Set([
+      "user_not_found",
+      "session_not_found",
+      "refresh_token_not_found",
+      "refresh_token_already_used",
+      "bad_jwt"
+    ]);
+    return invalidCodes.has(error?.code) || error?.status === 401 || error?.status === 403;
   }
 
   function reportError(error) {
