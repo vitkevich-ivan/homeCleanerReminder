@@ -1,4 +1,4 @@
-const CACHE_NAME = "home-cleaner-v3";
+const CACHE_NAME = "home-cleaner-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,9 +8,9 @@ const APP_SHELL = [
   "./vendor/supabase.js",
   "./manifest.webmanifest",
   "./icon.svg",
-  "./icon-192.png",
+  "./app-icon-192.png",
   "./icon-512.png",
-  "./apple-touch-icon.png"
+  "./app-icon-180.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -72,8 +72,8 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(self.registration.showNotification(payload.title, {
     body: payload.body,
-    icon: "./icon-192.png",
-    badge: "./icon-192.png",
+    icon: "./app-icon-192.png",
+    badge: "./app-icon-192.png",
     data: { url: "./" }
   }));
 });

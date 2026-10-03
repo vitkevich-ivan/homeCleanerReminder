@@ -365,8 +365,8 @@
       body: dueItems.length === 1
         ? `${dueItems[0].name} ждёт плановой очистки.`
         : `Устройств к очистке: ${dueItems.length}.`,
-      icon: "./icon-192.png",
-      badge: "./icon-192.png",
+      icon: "./app-icon-192.png",
+      badge: "./app-icon-192.png",
       tag: `cleaning-${today}`,
       data: { url: "./" }
     });
