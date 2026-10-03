@@ -1,6 +1,10 @@
 name: Send Due Reminders
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/send-reminders.yml"
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
