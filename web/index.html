@@ -21,9 +21,15 @@
           <p class="eyebrow">МОЯ ТЕХНИКА</p>
           <h1>Дом в порядке</h1>
         </div>
-        <button class="icon-button" id="installButton" type="button" aria-label="Установить приложение" title="Установить приложение">
-          <span aria-hidden="true">↓</span>
-        </button>
+        <div class="topbar-actions">
+          <button class="sync-status" id="syncStatus" type="button" aria-label="Состояние синхронизации" title="Синхронизация">
+            <span class="sync-dot" aria-hidden="true"></span>
+            <span id="syncStatusLabel">На устройстве</span>
+          </button>
+          <button class="icon-button" id="installButton" type="button" aria-label="Установить приложение" title="Установить приложение">
+            <span aria-hidden="true">↓</span>
+          </button>
+        </div>
       </header>
 
       <main>
@@ -100,6 +106,8 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <script src="./vendor/supabase.js" defer></script>
+    <script src="./cloud.js" defer></script>
     <script src="./app.js" defer></script>
   </body>
 </html>

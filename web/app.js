@@ -20,6 +20,8 @@
     list: document.querySelector("#applianceList"),
     addButton: document.querySelector("#addButton"),
     installButton: document.querySelector("#installButton"),
+    syncStatus: document.querySelector("#syncStatus"),
+    syncStatusLabel: document.querySelector("#syncStatusLabel"),
     notificationButton: document.querySelector("#notificationButton"),
     dialog: document.querySelector("#applianceDialog"),
     form: document.querySelector("#applianceForm"),
@@ -39,6 +41,8 @@
   let appliances = loadAppliances();
   let deferredInstallPrompt = null;
   let toastTimer = null;
+  let cloudSyncTimer = null;
+  let cloudReady = false;
 
   initialize();
 
@@ -48,6 +52,7 @@
     render();
     registerServiceWorker();
     checkDueNotifications();
+    initializeCloudSync();
 
     if (isStandalone()) {
       elements.installButton.classList.add("hidden");
@@ -64,6 +69,17 @@
     elements.installButton.addEventListener("click", handleInstall);
     elements.closeInstallButton.addEventListener("click", () => elements.installDialog.close());
     elements.notificationButton.addEventListener("click", enableNotifications);
+    elements.syncStatus.addEventListener("click", () => {
+      showToast(elements.syncStatus.dataset.detail || elements.syncStatusLabel.textContent);
+    });
+
+    window.addEventListener("homecleaner:cloudstatus", (event) => {
+      const { state, label, detail } = event.detail;
+      elements.syncStatus.className = `sync-status ${state}`;
+      elements.syncStatusLabel.textContent = label;
+      elements.syncStatus.dataset.detail = detail || label;
+      elements.syncStatus.title = detail || label;
+    });
 
     window.addEventListener("beforeinstallprompt", (event) => {
       event.preventDefault();
@@ -92,8 +108,34 @@
     }
   }
 
-  function persist() {
+  function persist(sync = true) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appliances));
+    if (sync) scheduleCloudSync();
+  }
+
+  async function initializeCloudSync() {
+    if (!window.HomeCleanerCloud) return;
+
+    try {
+      appliances = await window.HomeCleanerCloud.initialize(appliances);
+      cloudReady = true;
+      persist(false);
+      render();
+    } catch (error) {
+      window.HomeCleanerCloud.reportError(error);
+    }
+  }
+
+  function scheduleCloudSync() {
+    if (!cloudReady) return;
+    window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = window.setTimeout(async () => {
+      try {
+        await window.HomeCleanerCloud.save(appliances);
+      } catch (error) {
+        window.HomeCleanerCloud.reportError(error);
+      }
+    }, 500);
   }
 
   function render() {
@@ -188,7 +230,8 @@
       lastCleaned: elements.lastCleaned.value,
       interval: clamp(Number(elements.interval.value), 1, 730),
       createdAt: existing?.createdAt || new Date().toISOString(),
-      records: existing?.records || []
+      records: existing?.records || [],
+      updatedAt: new Date().toISOString()
     };
 
     if (!item.name) return;
@@ -210,6 +253,9 @@
 
     appliances = appliances.filter((item) => item.id !== id);
     persist();
+    if (cloudReady) {
+      window.HomeCleanerCloud.remove(id).catch(window.HomeCleanerCloud.reportError);
+    }
     render();
     elements.dialog.close();
     showToast("Техника удалена");
@@ -231,6 +277,7 @@
       const now = new Date();
       appliance.lastCleaned = toDateInput(now);
       appliance.records = [now.toISOString(), ...(appliance.records || [])].slice(0, 100);
+      appliance.updatedAt = now.toISOString();
       persist();
       render();
       showToast(`«${appliance.name}» отмечена как очищенная`);

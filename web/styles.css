@@ -108,6 +108,50 @@ h2 {
   font-weight: 500;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-status {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 13px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.75);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.sync-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #a9b2c2;
+}
+
+.sync-status.syncing .sync-dot {
+  background: var(--orange);
+  animation: sync-pulse 1s ease-in-out infinite;
+}
+
+.sync-status.synced .sync-dot {
+  background: var(--green);
+}
+
+.sync-status.offline .sync-dot {
+  background: #a9b2c2;
+}
+
+@keyframes sync-pulse {
+  50% { opacity: 0.35; }
+}
+
 .summary {
   position: relative;
   overflow: hidden;
@@ -486,6 +530,18 @@ h2 {
   .sheet {
     margin-bottom: 20px;
     border-radius: 28px;
+  }
+}
+
+@media (max-width: 420px) {
+  .sync-status span:last-child {
+    display: none;
+  }
+
+  .sync-status {
+    width: 38px;
+    justify-content: center;
+    padding: 0;
   }
 }
 

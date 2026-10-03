@@ -1,9 +1,11 @@
-const CACHE_NAME = "home-cleaner-v1";
+const CACHE_NAME = "home-cleaner-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./cloud.js",
+  "./vendor/supabase.js",
   "./manifest.webmanifest",
   "./icon.svg",
   "./icon-192.png",

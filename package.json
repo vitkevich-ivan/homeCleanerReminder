@@ -1,0 +1,13 @@
+{
+  "name": "home-cleaner-reminder",
+  "private": true,
+  "version": "1.0.0",
+  "description": "HomeCleaner PWA build tooling",
+  "scripts": {
+    "build:vendor": "node scripts/copy-vendor.mjs",
+    "check": "node --check web/app.js && node --check web/cloud.js && node --check web/sw.js"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.117.2"
+  }
+}
