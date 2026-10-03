@@ -772,9 +772,13 @@
       const leadDays = notificationLeadDays();
       localStorage.setItem(NOTIFICATION_HOUR_KEY, String(hour));
       localStorage.setItem(NOTIFICATION_LEAD_KEY, String(leadDays));
-      const pushEnabled = await subscribeToPush(hour, leadDays);
+      const pushResult = await subscribeToPush(hour, leadDays);
       await renderNotificationSettings();
-      showToast(pushEnabled ? "Фоновые напоминания включены" : "Напоминания включены при открытии");
+      if (pushResult.enabled && !pushResult.leadDaysSupported && leadDays > 0) {
+        showToast("Время сохранено; примените миграцию для раннего напоминания");
+      } else {
+        showToast(pushResult.enabled ? "Фоновые напоминания включены" : "Напоминания включены при открытии");
+      }
       await checkDueNotifications(true);
     } else {
       showToast("Уведомления не разрешены");
@@ -835,11 +839,11 @@
           applicationServerKey: urlBase64ToUint8Array(window.HomeCleanerCloud.vapidPublicKey)
         });
       }
-      await window.HomeCleanerCloud.savePushSubscription(subscription, preferredHour, remindDaysBefore);
-      return true;
+      const result = await window.HomeCleanerCloud.savePushSubscription(subscription, preferredHour, remindDaysBefore);
+      return { enabled: true, leadDaysSupported: result.leadDaysSupported };
     } catch (error) {
       window.HomeCleanerCloud.reportError(error);
-      return false;
+      return { enabled: false, leadDaysSupported: false };
     }
   }
 

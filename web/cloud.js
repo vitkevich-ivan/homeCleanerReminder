@@ -117,11 +117,22 @@
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await client
+    let { error } = await client
       .from("push_subscriptions")
       .upsert(row, { onConflict: "endpoint" });
 
+    let leadDaysSupported = true;
+    if (error?.code === "PGRST204" && /remind_days_before/i.test(error.message || "")) {
+      const legacyRow = { ...row };
+      delete legacyRow.remind_days_before;
+      ({ error } = await client
+        .from("push_subscriptions")
+        .upsert(legacyRow, { onConflict: "endpoint" }));
+      leadDaysSupported = false;
+    }
+
     if (error) throw error;
+    return { leadDaysSupported };
   }
 
   async function registerWithEmail(email, password) {
